@@ -3,7 +3,9 @@
 
 from referee.game import PlayerColor, Coord, Direction, \
     Action, MoveAction, GrowAction
-    
+from .function import *
+from .agent_board import Agent_Board
+from referee.game.board import CellState
 
 class Agent:
     """
@@ -22,6 +24,8 @@ class Agent:
                 print("Testing: I am playing as RED")
             case PlayerColor.BLUE:
                 print("Testing: I am playing as BLUE")
+        self.agent_board = Agent_Board(color)      
+
 
     def action(self, **referee: dict) -> Action:
         """
@@ -29,10 +33,21 @@ class Agent:
         to take an action. It must always return an action object. 
         """
 
+        next_move = find_next_move(self.agent_board, self._color)
+        # print(next_move)
+
+        if next_move == "GROW":
+            return GrowAction()
+        else:
+            directions = find_direction(next_move)
+            # print(directions)
+            return MoveAction(next_move[0], directions)
+        
         # Below we have hardcoded two actions to be played depending on whether
         # the agent is playing as BLUE or RED. Obviously this won't work beyond
         # the initial moves of the game, so you should use some game playing
         # technique(s) to determine the best action to take.
+        """
         match self._color:
             case PlayerColor.RED:
                 print("Testing: RED is playing a MOVE action")
@@ -43,13 +58,19 @@ class Agent:
             case PlayerColor.BLUE:
                 print("Testing: BLUE is playing a GROW action")
                 return GrowAction()
-
+        """
     def update(self, color: PlayerColor, action: Action, **referee: dict):
         """
         This method is called by the referee after a player has taken their
         turn. You should use it to update the agent's internal game state. 
         """
-
+        next_move = find_cell(self.agent_board, action)
+        if next_move == "GROW":
+            update_board_grow(self.agent_board, color)
+        else :
+            update_board(self.agent_board, next_move, color)
+        # print(self.agent_board.render(use_color=True))
+        
         # There are two possible action types: MOVE and GROW. Below we check
         # which type of action was played and print out the details of the
         # action for demonstration purposes. You should replace this with your
