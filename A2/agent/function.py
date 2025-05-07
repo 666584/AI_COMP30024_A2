@@ -2,7 +2,6 @@ from referee.game import PlayerColor, Coord, Direction, \
     Action, MoveAction, GrowAction
 from .agent_board import Agent_Board
 from referee.game.board import CellState
-import math
 import copy
 BOARD_N = 8
 FROG_N = 6
@@ -150,6 +149,40 @@ def evaluate(board, player):
     reachable_cells_other = get_reachable_cells(board, other_player)
     value = value - len(reachable_cells_other) 
     return value
+
+# For comparing different agent
+# Only considering status of player itself
+# Evaluate each move with score
+"""
+def evaluate2(board, player):
+    frogs = find_all_frog_position(board, player)
+    other_player = get_other_player(player)
+    other_frogs = find_all_frog_position(board, other_player)
+    value = 0
+    if player == PlayerColor.RED:
+        goal = 7
+    else:
+        goal = 0
+
+    # Number of player's frogs at goal 
+    for frog in frogs:
+        x = frog.__getattribute__("r")
+        if x == goal:
+            value = value + 10
+    # How close player's frogs are to the goal
+    for frog in frogs:
+        x = frog.__getattribute__("r")
+        if player == PlayerColor.RED:
+            value = value + x
+        else:
+            value = value + (7 - x)
+    # Number of player's frogs at goal 
+    for frog in frogs:
+        x = frog.__getattribute__("r")
+        if x == goal:
+            value = value + 10
+    return value
+"""
 
 # Determine if the game is end or not 
 def is_terminal(board):
