@@ -2,16 +2,13 @@ from referee.game import PlayerColor, Coord, Direction, \
     Action, MoveAction, GrowAction
 from .agent_board import Agent_Board
 from referee.game.board import CellState
-import math
 import copy
-import time
-
+import heapq
 BOARD_N = 8
 FROG_N = 6
 RED_DIRECTION = [Direction.Down, Direction.DownLeft, Direction.DownRight, Direction.Left, Direction.Right]
 BLUE_DIRECTION = [Direction.Up, Direction.UpLeft, Direction.UpRight, Direction.Left, Direction.Right]
 GROW_DIRECTION = [Direction.Up, Direction.UpLeft, Direction.UpRight, Direction.Down, Direction.DownLeft, Direction.DownRight, Direction.Left, Direction.Right]
-
 
 # Find list of positions of all frogs 
 def find_all_frog_position(agent_board, player):
@@ -153,6 +150,41 @@ def evaluate(board, player):
     value = value - len(reachable_cells_other) 
     return value
 
+
+# For comparing different agent
+# Only considering status of player itself
+# Evaluate each move with score
+"""
+def evaluate2(board, player):
+    frogs = find_all_frog_position(board, player)
+    other_player = get_other_player(player)
+    other_frogs = find_all_frog_position(board, other_player)
+    value = 0
+    if player == PlayerColor.RED:
+        goal = 7
+    else:
+        goal = 0
+
+    # Number of player's frogs at goal 
+    for frog in frogs:
+        x = frog.__getattribute__("r")
+        if x == goal:
+            value = value + 10
+    # How close player's frogs are to the goal
+    for frog in frogs:
+        x = frog.__getattribute__("r")
+        if player == PlayerColor.RED:
+            value = value + x
+        else:
+            value = value + (7 - x)
+    # Number of player's frogs at goal 
+    for frog in frogs:
+        x = frog.__getattribute__("r")
+        if x == goal:
+            value = value + 10
+    return value
+"""
+
 # Determine if the game is end or not 
 def is_terminal(board):
     c = 0
@@ -217,26 +249,23 @@ def get_final_moves(reachable_moves):
         final_moves[frog] = final_move
     return final_moves   
 
-# Check if move is valid
+# Check if a single movement is valid
+# New added
 def is_valid_move(board, frog, move):
-    """
-    Check if a move from frog to move is valid:
-    - The destination must not have a frog (RED or BLUE)
-    - Must be a LilyPad
-    """
     try:
         if not move:
             return False
-        dest_state = board._state[move].state
+        target_state = board._state[move].state
         
-        # If position has one frog exist, not valid
-        if dest_state == PlayerColor.RED or dest_state == PlayerColor.BLUE:
+        # If the position has one frog exist, not valid
+        if target_state == PlayerColor.RED or target_state == PlayerColor.BLUE:
             return False
-        return dest_state == "LilyPad"
+        return target_state == "LilyPad"
     except ValueError:
         return False
 
-# Check if path is valid
+# Check if a path is valid
+# New added
 def is_valid_path(board, frog, path):
     if not path:
         return False
@@ -245,16 +274,16 @@ def is_valid_path(board, frog, path):
     final_destination = path[-1] if path else None
     return is_valid_move(board, frog, final_destination)
 
-# Find all valid path
+# Find all valid paths
 def find_path_by_move(move, frog, reachable_cells):
     possible_paths = reachable_cells.get(frog, [])
     for path in possible_paths:
+        # Jump path
         if isinstance(path, list):
-            # Jump
             if path and path[-1] == move:
                 return path
+        # Move path
         elif path == move:
-            # Move
             return [path]
     return []
 
@@ -316,61 +345,40 @@ def alpha_beta_search(board, depth, alpha, beta, maximizing_player, player):
                     if beta <= alpha:
                         break 
         return min_eval   
-
-def find_direction(next_move):
-    if next_move == "GROW":
-        return None
-        
-    frog, moves = next_move
-    if not moves:
-        return []
-        
-    if not isinstance(moves, list):
-        moves = [moves]
-        
-    directions = []
-    x = frog.__getattribute__("r")
-    y = frog.__getattribute__("c")
-    
-    for move in moves:
-        if move is None:
-            continue
-            
-        i = move.__getattribute__("r")
-        j = move.__getattribute__("c")    
-        r = i - x
-        c = j - y
-        if r != 0:
-            r = int(r // abs(r))
-        if c != 0:
-            c = int(c // abs(c))
-        directions.append(Direction(r, c))
-        x = i
-        y = j
-    
-    return directions
-
+           
+# Find new cell of the frog
 def find_cell(board, action):
-    match action:
-        case MoveAction(coord, dirs):
-            x = coord.__getattribute__("r")
-            y = coord.__getattribute__("c")
-            r = 0
-            c = 0
-            for dir in dirs:
-                i = dir.__getattribute__("r")
-                j = dir.__getattribute__("c")
+    if isinstance(action, MoveAction):
+        # Get start coordinate and direction
+        coord = action.coord
+        dirs = action.directions
+        
+        x = coord.r
+        y = coord.c
+        r = 0
+        c = 0
+        # Loop through all directions
+        for dir in dirs:
+            i = dir.r
+            j = dir.c
+            r = r + i
+            c = c + j
+            # Check if need to jump through frog
+            cell_coord = Coord(r + x, c + y)
+            state = board._state[cell_coord].state
+            
+            if state == PlayerColor.BLUE or state == PlayerColor.RED:
                 r = r + i
                 c = c + j
-                state = board._state[Coord(r + x, c + y)].state
-                if state == PlayerColor.BLUE or state == PlayerColor.RED:
-                    r = r + i
-                    c = c + j
-            return (coord, Coord(r + x, c + y))
-        case GrowAction():
-            return "GROW"
+                
+        return (coord, Coord(r + x, c + y))
+    elif isinstance(action, GrowAction):
+        return "GROW"
+    else:
+        return None
         
 # Evaluate distance to target
+# New added
 def heuristic(board, player):
     frogs = find_all_frog_position(board, player)
     value = 0
@@ -391,10 +399,9 @@ def heuristic(board, player):
     
     return value
 
-# A* to find the best path
+# Use A* to find the best path
+# New added
 def astar_search(board, player, max_depth=3):
-    import heapq
-    
     initial_state = (board, None, None)
     
     # Store all visited path
@@ -404,15 +411,17 @@ def astar_search(board, player, max_depth=3):
     state_counter = 0
     queue = [(heuristic(board, player), 0, state_counter, initial_state)]
     state_counter += 1
-    
+    # g_score: actual cost
     g_score = {str(board._state): 0}
-    
+    # Inilize
     best_action = None
     best_score = float('-inf')
     
+    # Get lowest f value
     while queue and len(queue) < 1000:  
         f_score, depth, _, (current_board, frog, move) = heapq.heappop(queue)
         
+        # Skip if visited
         board_str = str(current_board._state)
         if board_str in visited:
             continue
@@ -431,6 +440,7 @@ def astar_search(board, player, max_depth=3):
         
         # Generate next possible movement
         for next_frog, moves in final_moves.items():
+            # Grow
             if next_frog == "GROW":
                 new_board = copy.deepcopy(current_board)
                 new_board = update_board_grow(new_board, player)
@@ -454,6 +464,7 @@ def astar_search(board, player, max_depth=3):
                         if current_score > best_score:
                             best_score = current_score
                             best_action = "GROW"
+            # Move
             else:
                 if moves:
                     for next_move in moves:
@@ -488,6 +499,7 @@ def astar_search(board, player, max_depth=3):
     
     return best_action
 # Find the best movement for current frog
+# Updated
 def find_next_move(board, player, timer=None):
     # Record score of all movements
     move_scores = {}
